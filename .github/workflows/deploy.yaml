@@ -1,34 +1,49 @@
-name: Build and Deploy Angular App
+name: Build and Deploy Angular App with Merge and Commit Pipeline
 
 on:
-  push:
-    branches:
-      - main  # Trigger the workflow on commits to the main branch
   pull_request:
+    types: [opened, synchronize]  # Run workflow on new or updated PRs
     branches:
-      - main
+      - main                      # Only trigger on PRs targeting main
 
 jobs:
-  build:
+  test_and_merge:
     runs-on: ubuntu-latest
 
     steps:
+      # Step 1: Check out the repository
       - name: Checkout repository
         uses: actions/checkout@v2
 
+      # Step 2: Set up Node.js (Adjust the version as needed)
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '18.13'  # Updated Node.js version
+          node-version: '18.13'
 
+      # Step 3: Install dependencies
       - name: Install dependencies
         run: npm install
 
-      - name: Build Angular app
-        run: npm run build --prod
+      # Step 4: Run tests (if you have tests)
+      - name: Run tests
+        run: npm test
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist/angular-topic-wise-project
+      # Step 5: Build (optional if your project requires a build step)
+      - name: Build project
+        run: npm run build
+
+      # Step 6: Merge the pull request if all checks pass
+      - name: Merge pull request
+        if: github.event_name == 'pull_request' && github.event.action == 'opened' || github.event.action == 'synchronize'
+        run: |
+          gh pr merge ${{ github.event.pull_request.number }} --squash --repo ${{ github.repository }} --subject "Merging PR #${{ github.event.pull_request.number }}"
+
+      # [Optional] Step 7: Commit additional changes (e.g., formatting)
+      - name: Commit changes
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "Apply formatting changes"
+          git push
